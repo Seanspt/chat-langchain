@@ -23,6 +23,10 @@ from langsmith import Client
 from pydantic import BaseModel
 
 from constants import WEAVIATE_DOCS_INDEX_NAME
+from langchain.llms import LlamaCpp
+from langchain.callbacks.manager import CallbackManager
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+
 
 RESPONSE_TEMPLATE = """\
 You are an expert programmer and problem-solver, tasked with answering any question \
@@ -196,11 +200,19 @@ def create_chain(
     )
 
 
-llm = ChatOpenAI(
-    model="gpt-3.5-turbo-16k",
-    streaming=True,
-    temperature=0,
+
+callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
+llama_model_path = os.environ['LLAMA_MODEL_PATH']
+llm = LlamaCpp(
+    model_path=llama_model_path,
+    temperature=0.75,
+    max_tokens=2000,
+    top_p=1,
+    callback_manager=callback_manager,
+    verbose=True,  # Verbose is required to pass to the callback manager
 )
+
+
 retriever = get_retriever()
 answer_chain = create_chain(
     llm,
