@@ -199,6 +199,28 @@ def create_chain(
         | response_synthesizer
     )
 
+def create_simple_chain(llm):
+    CONDENSE_QUESTION_PROMPT = PromptTemplate.from_template(REPHRASE_TEMPLATE)
+    condense_question_chain = (
+        CONDENSE_QUESTION_PROMPT | llm | StrOutputParser()
+    ).with_config(
+        run_name="CondenseQuestion",
+    )
+    conversation_chain = condense_question_chain
+    return RunnableBranch(
+        (
+            RunnableLambda(lambda x: bool(x.get("chat_history"))).with_config(
+                run_name="HasChatHistoryCheck"
+            ),
+            conversation_chain.with_config(run_name="RetrievalChainWithHistory"),
+        ),
+        (
+            RunnableLambda(itemgetter("question")).with_config(
+                run_name="Itemgetter:question"
+            )
+        ).with_config(run_name="RetrievalChainWithNoHistory"),
+    ).with_config(run_name="RouteDependingOnChatHistory")
+
 
 
 callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
@@ -207,14 +229,27 @@ llm = LlamaCpp(
     model_path=llama_model_path,
     temperature=0.75,
     max_tokens=2000,
+    n_gpu_layers=80,
     top_p=1,
     callback_manager=callback_manager,
     verbose=True,  # Verbose is required to pass to the callback manager
 )
-
-
-retriever = get_retriever()
-answer_chain = create_chain(
-    llm,
-    retriever,
+from langchain.chains import LLMChain
+from langchain_experimental.chat_models import Llama2Chat
+model = Llama2Chat(llm=llm)
+from langchain.prompts.chat import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    MessagesPlaceholder,
 )
+from langchain.schema import SystemMessage
+
+template_messages = [
+    SystemMessage(content="You are a helpful assistant."),
+    MessagesPlaceholder(variable_name="chat_history"),
+    HumanMessagePromptTemplate.from_template("{question}"),
+]
+prompt_template = ChatPromptTemplate.from_messages(template_messages)
+from langchain.memory import ConversationBufferMemory
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+answer_chain = LLMChain(llm=model, prompt=prompt_template, memory=memory)
