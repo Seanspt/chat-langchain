@@ -106,7 +106,7 @@ def get_retriever() -> BaseRetriever:
 
     embeddings = get_embeddings_model()
     db = Chroma.from_texts(texts, embeddings)
-    retriever = db.as_retriever()
+    return db.as_retriever()
 
 
 def create_retriever_chain(
