@@ -110,7 +110,11 @@ export function ChatWindow(props: {
           throw err;
         },
         onmessage(msg) {
+<<<<<<< HEAD
           console.log(msg)
+=======
+          console.log(msg);
+>>>>>>> e5328bd1033a0c68349fdbdde3dd6e6a06413e9c
           if (msg.event === "end") {
             setChatHistory((prevChatHistory) => [
               ...prevChatHistory,
