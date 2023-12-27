@@ -5,8 +5,6 @@ from typing import Dict, List, Optional, Sequence
 import weaviate
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from langchain.chat_models import ChatOpenAI
-from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.embeddings.voyageai import VoyageEmbeddings
 from langchain.prompts import (ChatPromptTemplate, MessagesPlaceholder,
                                PromptTemplate)
@@ -93,26 +91,22 @@ class ChatRequest(BaseModel):
     chat_history: Optional[List[Dict[str, str]]]
 
 
+from langchain.embeddings import FakeEmbeddings
 def get_embeddings_model() -> Embeddings:
-    if os.environ.get("VOYAGE_API_KEY") and os.environ.get("VOYAGE_AI_MODEL"):
-        return VoyageEmbeddings(model=os.environ["VOYAGE_AI_MODEL"])
-    return OpenAIEmbeddings(chunk_size=200)
+    return FakeEmbeddings(size=1352)
 
 
 def get_retriever() -> BaseRetriever:
-    weaviate_client = weaviate.Client(
-        url=WEAVIATE_URL,
-        auth_client_secret=weaviate.AuthApiKey(api_key=WEAVIATE_API_KEY),
-    )
-    weaviate_client = Weaviate(
-        client=weaviate_client,
-        index_name=WEAVIATE_DOCS_INDEX_NAME,
-        text_key="text",
-        embedding=get_embeddings_model(),
-        by_text=False,
-        attributes=["source", "title"],
-    )
-    return weaviate_client.as_retriever(search_kwargs=dict(k=6))
+    from langchain.text_splitter import CharacterTextSplitter
+    from langchain.vectorstores import Chroma
+
+    full_text = open("state_of_the_union.txt", "r").read()
+    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    texts = text_splitter.split_text(full_text)
+
+    embeddings = get_embeddings_model()
+    db = Chroma.from_texts(texts, embeddings)
+    retriever = db.as_retriever()
 
 
 def create_retriever_chain(
@@ -252,4 +246,4 @@ template_messages = [
 prompt_template = ChatPromptTemplate.from_messages(template_messages)
 from langchain.memory import ConversationBufferMemory
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-answer_chain = LLMChain(llm=model, prompt=prompt_template, memory=memory)
+answer_chain = create_retriever_chain(model, get_retriever())
