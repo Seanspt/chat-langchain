@@ -228,22 +228,8 @@ llm = LlamaCpp(
     callback_manager=callback_manager,
     verbose=True,  # Verbose is required to pass to the callback manager
 )
-from langchain.chains import LLMChain
+
 from langchain_experimental.chat_models import Llama2Chat
 model = Llama2Chat(llm=llm)
-from langchain.prompts.chat import (
-    ChatPromptTemplate,
-    HumanMessagePromptTemplate,
-    MessagesPlaceholder,
-)
-from langchain.schema import SystemMessage
 
-template_messages = [
-    SystemMessage(content="You are a helpful assistant."),
-    MessagesPlaceholder(variable_name="chat_history"),
-    HumanMessagePromptTemplate.from_template("{question}"),
-]
-prompt_template = ChatPromptTemplate.from_messages(template_messages)
-from langchain.memory import ConversationBufferMemory
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 answer_chain = create_retriever_chain(model, get_retriever())
