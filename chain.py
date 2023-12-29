@@ -18,7 +18,7 @@ from langchain.schema.runnable import (Runnable, RunnableBranch,
                                        RunnableLambda, RunnableMap)
 from langchain.vectorstores.weaviate import Weaviate
 from langsmith import Client
-from pydantic import BaseModel
+from langserve.pydantic_v1 import BaseModel
 
 from constants import WEAVIATE_DOCS_INDEX_NAME
 from langchain.llms import LlamaCpp
@@ -128,4 +128,4 @@ llm = LlamaCpp(
 from langchain_experimental.chat_models import Llama2Chat
 model = Llama2Chat(llm=llm)
 
-answer_chain = create_chain(model)
+answer_chain = create_chain(model).with_types(input_type=ChatRequest)
