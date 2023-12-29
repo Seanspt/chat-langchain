@@ -82,7 +82,6 @@ def serialize_history(request: ChatRequest):
 
 def create_chain(
     llm: BaseLanguageModel,
-    retriever: BaseRetriever,
 ) -> Runnable:
     _context = RunnableMap(
         {
@@ -129,4 +128,4 @@ llm = LlamaCpp(
 from langchain_experimental.chat_models import Llama2Chat
 model = Llama2Chat(llm=llm)
 
-answer_chain = create_retriever_chain(model)
+answer_chain = create_chain(model)
