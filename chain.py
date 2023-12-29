@@ -27,31 +27,7 @@ from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 
 
 RESPONSE_TEMPLATE = """\
-You are an expert programmer and problem-solver, tasked with answering any question \
-about Langchain.
-
-Generate a comprehensive and informative answer of 80 words or less for the \
-given question based solely on the provided search results (URL and content). You must \
-only use information from the provided search results. Use an unbiased and \
-journalistic tone. Combine search results together into a coherent answer. Do not \
-repeat text. Cite search results using [${{number}}] notation. Only cite the most \
-relevant results that answer the question accurately. Place these citations at the end \
-of the sentence or paragraph that reference them - do not put them all at the end. If \
-different results refer to different entities within the same name, write separate \
-answers for each entity.
-
-You should use bullet points in your answer for readability. Put citations where they apply
-rather than putting them all at the end.
-
-If there is nothing in the context relevant to the question at hand, just say "Hmm, \
-I'm not sure." Don't try to make up an answer.
-
-Anything between the following `context`  html blocks is retrieved from a knowledge \
-bank, not part of the conversation with the user. 
-
-<context>
-    {context} 
-<context/>
+You are a primary school english teacher, trying to help students improving their english.\
 
 REMEMBER: If there is no relevant information within the context, just say "Hmm, I'm \
 not sure." Don't try to make up an answer. Anything between the preceding 'context' \
@@ -81,59 +57,9 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-
-# WEAVIATE_URL = os.environ["WEAVIATE_URL"]
-# WEAVIATE_API_KEY = os.environ["WEAVIATE_API_KEY"]
-
-
 class ChatRequest(BaseModel):
     question: str
     chat_history: Optional[List[Dict[str, str]]]
-
-
-from langchain.embeddings import FakeEmbeddings
-def get_embeddings_model() -> Embeddings:
-    return FakeEmbeddings(size=1352)
-
-
-def get_retriever() -> BaseRetriever:
-    from langchain.text_splitter import CharacterTextSplitter
-    from langchain.vectorstores import Chroma
-
-    full_text = open("state_of_the_union.txt", "r").read()
-    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    texts = text_splitter.split_text(full_text)
-
-    embeddings = get_embeddings_model()
-    db = Chroma.from_texts(texts, embeddings)
-    return db.as_retriever()
-
-
-def create_retriever_chain(
-    llm: BaseLanguageModel, retriever: BaseRetriever
-) -> Runnable:
-    CONDENSE_QUESTION_PROMPT = PromptTemplate.from_template(REPHRASE_TEMPLATE)
-    condense_question_chain = (
-        CONDENSE_QUESTION_PROMPT | llm | StrOutputParser()
-    ).with_config(
-        run_name="CondenseQuestion",
-    )
-    conversation_chain = condense_question_chain | retriever
-    return RunnableBranch(
-        (
-            RunnableLambda(lambda x: bool(x.get("chat_history"))).with_config(
-                run_name="HasChatHistoryCheck"
-            ),
-            conversation_chain.with_config(run_name="RetrievalChainWithHistory"),
-        ),
-        (
-            RunnableLambda(itemgetter("question")).with_config(
-                run_name="Itemgetter:question"
-            )
-            | retriever
-        ).with_config(run_name="RetrievalChainWithNoHistory"),
-    ).with_config(run_name="RouteDependingOnChatHistory")
-
 
 def format_docs(docs: Sequence[Document]) -> str:
     formatted_docs = []
@@ -158,13 +84,8 @@ def create_chain(
     llm: BaseLanguageModel,
     retriever: BaseRetriever,
 ) -> Runnable:
-    retriever_chain = create_retriever_chain(
-        llm,
-        retriever,
-    ).with_config(run_name="FindDocs")
     _context = RunnableMap(
         {
-            "context": retriever_chain | format_docs,
             "question": itemgetter("question"),
             "chat_history": itemgetter("chat_history"),
         }
@@ -193,30 +114,6 @@ def create_chain(
         | response_synthesizer
     )
 
-def create_simple_chain(llm):
-    CONDENSE_QUESTION_PROMPT = PromptTemplate.from_template(REPHRASE_TEMPLATE)
-    condense_question_chain = (
-        CONDENSE_QUESTION_PROMPT | llm | StrOutputParser()
-    ).with_config(
-        run_name="CondenseQuestion",
-    )
-    conversation_chain = condense_question_chain
-    return RunnableBranch(
-        (
-            RunnableLambda(lambda x: bool(x.get("chat_history"))).with_config(
-                run_name="HasChatHistoryCheck"
-            ),
-            conversation_chain.with_config(run_name="RetrievalChainWithHistory"),
-        ),
-        (
-            RunnableLambda(itemgetter("question")).with_config(
-                run_name="Itemgetter:question"
-            )
-        ).with_config(run_name="RetrievalChainWithNoHistory"),
-    ).with_config(run_name="RouteDependingOnChatHistory")
-
-
-
 callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
 llama_model_path = os.environ['LLAMA_MODEL_PATH']
 llm = LlamaCpp(
@@ -232,4 +129,4 @@ llm = LlamaCpp(
 from langchain_experimental.chat_models import Llama2Chat
 model = Llama2Chat(llm=llm)
 
-answer_chain = create_retriever_chain(model, get_retriever())
+answer_chain = create_retriever_chain(model)
